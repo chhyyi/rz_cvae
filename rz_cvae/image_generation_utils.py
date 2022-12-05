@@ -49,8 +49,36 @@ def image_generation(model, test_data, target_attr = None, save_path = None):
 #  Image Reconstruction #
 #########################
 
-
 def image_reconstruction(model, test_data, save_path=None):
+    """
+    Reconstructs and plots a bacth of test images.
+    """
+
+    batch_gen, paths = batch_generator(test_data['batch_size'], test_data['test_img_ids'], model_name = 'Conv')
+    images, labels= next(batch_gen)
+    model_output= model((images, labels), is_train = False)
+    
+    print("original img paths: " paths)
+    
+    f = plt.figure(figsize=(24,60))
+    ax = f.add_subplot(1,2,1)
+    ax.imshow(convert_batch_to_image_grid(images))
+    plt.axis('off')
+
+    ax = f.add_subplot(1,2,2)
+    ax.imshow(convert_batch_to_image_grid(model_output['recon_img'].numpy()))
+    plt.axis('off')
+    
+    if save_path :
+        plt.savefig(save_path + "reconstruction.png")
+
+    plt.show()
+    plt.clf()
+
+    print("Reconstruction of a batch of test set images.")
+
+
+def image_reconstruction_old(model, test_data, save_path=None):
     """
     Reconstructs and plots a bacth of test images.
     """

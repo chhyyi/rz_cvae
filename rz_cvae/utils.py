@@ -84,8 +84,26 @@ def read_data(file_name):
 #  Utils for plotting  #
 ########################
 
-
 def batch_generator(batch_dim, test_labels, model_name):
+    """
+    Batch generator using the given list of labels. return img paths too.
+    """
+    while True:
+        batch_imgs = []
+        labels = []
+        for label in (test_labels):
+            labels.append(label)
+            if len(labels) == batch_dim:
+                batch_imgs, img_paths = create_image_batch(labels, model_name, path_return=True)
+                batch_labels = [x[1] for x in labels]
+                yield np.asarray(batch_imgs), np.asarray(batch_labels), img_paths
+                batch_imgs = []
+                labels = []
+                batch_labels = []
+        if batch_imgs:
+            yield np.asarray(batch_imgs), np.asarray(batch_labels), img_paths
+
+def batch_generator_old(batch_dim, test_labels, model_name):
     """
     Batch generator using the given list of labels.
     """
@@ -124,7 +142,7 @@ def get_image(image_path, model_name, img_resize = 1024):
     return img
 
 
-def create_image_batch(labels, model_name):
+def create_image_batch_old(labels, model_name):
     """
     Returns the list of images corresponding to the given labels.
     """
@@ -145,7 +163,30 @@ def create_image_batch(labels, model_name):
 
     return imgs
 
+def create_image_batch(labels, model_name, use_train=False, path_return=False):
+    """
+    Returns the list of images corresponding to the given labels.
+    """
+    imgs = []
+    paths = []
+    imgs_id = [item[0] for item in labels]
+    
+    #hard code few lines...
+    test_data = read_data("./test_data")
+    img_paths = test_data['img_paths']
+    path_cols=[0,1]
 
+    for i in imgs_id:
+        img = []
+        for j in range(len(path_cols)):
+            image_path = img_paths[i][j]
+            paths.append(image_path)
+            img.append(get_image(image_path, model_name))
+        imgs.append(np.concatenate(tuple(img),axis=-1))
+    if path_return == True:
+        return imgs, paths
+    else:
+        return imgs
 
 def convert_batch_to_image_grid(image_batch, dim = 1024):
     reshaped = (image_batch.reshape(4, 1, dim, dim, 6)
