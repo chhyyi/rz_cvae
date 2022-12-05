@@ -10,8 +10,6 @@ import tensorflow as tf
 from tensorflow.keras.initializers import he_normal
 from tensorflow.keras.layers import BatchNormalization, Conv2D, Conv2DTranspose, MaxPool2D, UpSampling2D, Dropout
 
-dropout_dense = 0.5
-dropout_conv2d = 0.25
 
 #########################
 #        ENCODER        #
@@ -59,9 +57,12 @@ class Encoder(tf.keras.Model):
         self.dense = tf.keras.layers.Dense(latent_dim + latent_dim, kernel_regularizer='l1')
 
 
-    def call(self, conditional_input, latent_dim, is_train):
+    def call(self, img_input, lbl_input, latent_dim, is_train):
+        dropout_dense = 0.5
+        dropout_conv2d = 0.25
+
          # Encoder block 1
-        x = self.enc_block_1(conditional_input)
+        x = self.enc_block_1(img_input)
         x = BatchNormalization(trainable = is_train)(x)
         x = tf.nn.leaky_relu(x)
         x = Dropout(dropout_conv2d)(x)
@@ -81,8 +82,10 @@ class Encoder(tf.keras.Model):
         x = tf.nn.leaky_relu(x)   
         
         x = Dropout(dropout_conv2d)(x)
-        x = self.dense(self.flatten(x))
-
+        x = self.flatten(x)
+        
+        x_lbl_concat = tf.concat([x,lbl_input],1)
+        x = self.dense(x_lbl_concat)
         return x
 
 
@@ -144,6 +147,9 @@ class Decoder(tf.keras.Model):
                 kernel_initializer=he_normal())
 
     def __call__(self, z_cond, is_train):
+        dropout_dense = 0.5
+        dropout_conv2d = 0.25
+
         # Reshape input
         x = self.dense(z_cond)
         x = tf.nn.leaky_relu(x)
@@ -202,12 +208,19 @@ class CVAE_M1(tf.keras.Model) :
         self.beta = beta = 1
         self.image_dim = image_dim              
 
+    def kl_loss(self, z_mu,z_rho): #kl loss from gozsoy's cvae github repo
+        sigma_squared = tf.math.softplus(z_rho) ** 2
+        kl_1d = -0.5 * (1 + tf.math.log(sigma_squared) - z_mu ** 2 - sigma_squared)
+
+        # sum over sample dim, average over batch dim
+        kl_batch = tf.reduce_mean(tf.reduce_sum(kl_1d,axis=1))
+        return kl_batch
 
     def __call__(self, inputs, is_train):
     
-        input_img, input_label, conditional_input = self.conditional_input(inputs)
+        input_img, input_label = self.conditional_input(inputs)
 
-        z_mean, z_log_var = tf.split(self.encoder(conditional_input, self.latent_dim, is_train), num_or_size_splits=2, axis=1)    
+        z_mean, z_log_var = tf.split(self.encoder(input_img, input_label, self.latent_dim, is_train), num_or_size_splits=2, axis=1)    
         z_cond = self.reparametrization(z_mean, z_log_var, input_label)
         logits = self.decoder(z_cond, is_train)
 
@@ -215,10 +228,11 @@ class CVAE_M1(tf.keras.Model) :
         #temp for debugging
         
         # Loss computation #
+        #latent_loss = - 0.5 * self.kl_loss(z_mean, z_log_var) # KL divergence
         latent_loss = - 0.5 * tf.reduce_sum(1 + z_log_var - tf.square(z_mean) - tf.exp(z_log_var), axis=-1) # KL divergence
         mse=tf.keras.losses.MeanSquaredError()
         try:
-            reconstr_loss = np.prod((64,64)) * mse(tf.keras.backend.flatten(input_img), tf.keras.backend.flatten(recon_img)) # over weighted MSE
+            reconstr_loss = np.prod((1024,1024))*mse(tf.keras.backend.flatten(input_img), tf.keras.backend.flatten(recon_img)) #weigthed mse... but why?
         except:
             print('error while input_img shape: {} and recon_img shape: {}'.format(input_img.shape, recon_img.shape, sep='\n\n'))
             raise
@@ -240,9 +254,8 @@ class CVAE_M1(tf.keras.Model) :
 
         input_img = tf.keras.layers.InputLayer(input_shape=self.image_dim, dtype = 'float32')(inputs[0])
         input_label = tf.keras.layers.InputLayer(input_shape=(self.label_dim,), dtype = 'float32')(inputs[1])
-        conditional_input = tf.keras.layers.InputLayer(input_shape=(self.image_dim[0], self.image_dim[1], self.image_dim[2]), dtype = 'float32')(inputs[0]) # not conditional anymore.
 
-        return input_img, input_label, conditional_input
+        return input_img, input_label
 
 
     def reparametrization(self, z_mean, z_log_var, input_label):
