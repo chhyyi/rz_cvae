@@ -102,9 +102,9 @@ class Decoder(tf.keras.Model):
         super(Decoder, self).__init__()
 
         self.batch_size = batch_size
-        self.dense = tf.keras.layers.Dense(4*4*self.batch_size*8*8, kernel_regularizer='l1') # it should match final output of image size of Encoder squared by latent dim.
+        self.dense = tf.keras.layers.Dense(4*4*(128+128), kernel_regularizer='l1') # it should match final output of image size of Encoder squared by latent dim.
                                           
-        self.reshape = tf.keras.layers.Reshape(target_shape=(4, 4, self.batch_size*8*8))
+        self.reshape = tf.keras.layers.Reshape(target_shape=(4, 4, (128+128)))
 
         self.dec_block_1 = Conv2DTranspose(
                 filters=256,
@@ -216,10 +216,11 @@ class CVAE_M1(tf.keras.Model) :
         kl_batch = tf.reduce_mean(tf.reduce_sum(kl_1d,axis=1))
         return kl_batch
 
-    def __call__(self, inputs, is_train):
+    def __call__(self, input_image, input_label, is_train):
     
-        input_img, input_label = self.conditional_input(inputs)
-
+        input_img = tf.keras.layers.InputLayer(input_shape=self.image_dim, dtype = 'float32')(input_image)
+        input_label = tf.keras.layers.InputLayer(input_shape=(self.label_dim,), dtype = 'float32')(input_label)
+        
         z_mean, z_log_var = tf.split(self.encoder(input_img, input_label, self.latent_dim, is_train), num_or_size_splits=2, axis=1)    
         z_cond = self.reparametrization(z_mean, z_log_var, input_label)
         logits = self.decoder(z_cond, is_train)
@@ -247,16 +248,6 @@ class CVAE_M1(tf.keras.Model) :
                     'z_mean': z_mean,
                     'z_log_var': z_log_var
                 }
-
-
-    def conditional_input(self, inputs):
-        """ Builds the conditional input and returns the original input images, their labels and the conditional input."""
-
-        input_img = tf.keras.layers.InputLayer(input_shape=self.image_dim, dtype = 'float32')(inputs[0])
-        input_label = tf.keras.layers.InputLayer(input_shape=(self.label_dim,), dtype = 'float32')(inputs[1])
-
-        return input_img, input_label
-
 
     def reparametrization(self, z_mean, z_log_var, input_label):
         """ Performs the riparametrization trick"""

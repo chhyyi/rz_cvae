@@ -6,7 +6,9 @@ import matplotlib.pyplot as plt
 import numpy as np
 import tensorflow as tf
 
-from .utils import batch_generator, convert_batch_to_image_grid
+from .utils import convert_batch_to_image_grid
+#from .utils import batch_generator_old as batch_generator
+from .utils import batch_generator
 
 
 
@@ -50,25 +52,28 @@ def image_generation(model, test_data, target_attr = None, save_path = None):
 #########################
 
 def image_reconstruction(model, test_data, save_path=None):
+    
     """
     Reconstructs and plots a bacth of test images.
     """
 
-    batch_gen, paths = batch_generator(test_data['batch_size'], test_data['test_img_ids'], model_name = 'Conv')
-    images, labels= next(batch_gen)
-    model_output= model((images, labels), is_train = False)
-    
-    print("original img paths: " paths)
-    
+    batch_gen = batch_generator(test_data['batch_size'], test_data['test_img_ids'], model_name = 'Conv')
+    images, labels, paths = next(batch_gen)
+    model_outputs = model(images, labels, is_train=False)
+
+    print('files \n',[x.split('/')[-1] for x in paths])
+
     f = plt.figure(figsize=(24,60))
     ax = f.add_subplot(1,2,1)
     ax.imshow(convert_batch_to_image_grid(images))
     plt.axis('off')
 
     ax = f.add_subplot(1,2,2)
-    ax.imshow(convert_batch_to_image_grid(model_output['recon_img'].numpy()))
+    ax.imshow(convert_batch_to_image_grid(model_outputs['recon_img'].numpy()))
     plt.axis('off')
-    
+
+
+    save_path = False
     if save_path :
         plt.savefig(save_path + "reconstruction.png")
 

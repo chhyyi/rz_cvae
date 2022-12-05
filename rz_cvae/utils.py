@@ -19,7 +19,7 @@ def train_step(data, model, optimizer):
 
     with tf.GradientTape() as tape:
 
-        model_output = model(data, is_train = True)
+        model_output = model(data[0], data[1], is_train = True)
 
     trainable_variables = model.trainable_variables
     grads = tape.gradient(model_output['loss'], trainable_variables)
