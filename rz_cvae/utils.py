@@ -136,11 +136,11 @@ def create_image_batch(labels, model_name, use_train=False, path_return=False):
 
     for i in imgs_id:
         img = []
-        for j in self.path_col_iter:
-            image_path = self.img_paths[i][j]
+        for j in path_col_iter:
+            image_path = img_paths[i][j]
             paths.append(image_path)
-            img.append(get_image(image_path, model_name, img_resize = self.img_size))
-            imgs.append(np.concatenate(tuple(img),axis=-1)) #concatenate images by increasing channel
+            img.append(get_image(image_path, model_name, img_resize = 1024))
+        imgs.append(np.concatenate(tuple(img),axis=-1)) #concatenate images by increasing channel
 
     if path_return == True:
         return imgs, paths
