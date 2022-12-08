@@ -147,11 +147,11 @@ def create_image_batch(labels, model_name, use_train=False, path_return=False):
     else:
         return imgs
 
-def convert_batch_to_image_grid(image_batch, dim = 1024):
-    reshaped = (image_batch.reshape(4, 1, dim, dim, 6)
+def convert_batch_to_image_grid(image_batch, dim = 1024, batch_size=4, num_plot_imgs=4):
+    reshaped = (image_batch.reshape(batch_size, 1, dim, dim, 6)
               .transpose(0, 2, 1, 3, 4)
-              .reshape(4 * dim, dim, 6))
-    return reshaped[:,:,:3]
+              .reshape(batch_size * dim, dim, 6))
+    return reshaped[:dim*num_plot_imgs,:,:3]
 
 
 def imshow_grid(imgs, model_name, shape=[10, 1], name='default', save=False):
