@@ -1,4 +1,5 @@
 import pandas as pd
+import numpy as np
 import json
 import datetime
 import urllib.request
@@ -113,38 +114,67 @@ class Crawler():
                     urllib.request.urlretrieve(file_url, save_file_dir)
             date+=datetime.timedelta(days=1)
     
-    def generate_json(self, json_path, json_name = "dataset.json", dataset_path=None):
+    def dataset_files(self, dataset_path = None):
         """
-        def generate_json(self, json_path, json_name = "dataset.json", dataset_path=None):
-        generate NetCDF / Imgs dataset list with metadata as a json file,
-        as {json_path}/{json_name}.json
+        return list of files on dataset_path.
         if not dataset_path: dataset_path = self.dir
         """
         if not dataset_path:
             dataset_path = self.dir
-        files = os.listdir(dataset_path)
-        data = {'id':[], 'product':[], 'datetime':[], 'path':[], 'format':[], 'fillvalue':[], 'land_mask':[]}
+        return os.listdir(dataset_path), dataset_path
+        
+
+    def organize_dataset(self, json_path, json_name = "dataset.json", npy_path = "npy", dataset_path = None):
+        """
+        def generate_json(self, json_path, json_name = "dataset.json", dataset_path=None):
+        - generate NetCDF / Imgs dataset list with metadata as a json file,
+        as {json_path}/{json_name}.json
+        - generate npy file of mask, products array.
+        """
+
+        files, dataset_path = self.dataset_files(dataset_path)
+        data = {'id':[], 'product':[], 'datetime':[], 'path':[], 'format':[], 'fillvalue':[], 'npy':[]}
     
         try:
             os.makedirs(json_path)
         except FileExistsError:
             pass
+
+        try:
+            os.makedirs(npy_path)
+        except FileExistsError:
+            pass
         
         for file in files:
-            _, suffix = os.path.basename(file).split('.')
-
-            if suffix == 'nc':
-                with nc4.Dataset(os.path.join(dataset_path, file)) as root:
-                    data['id'].append(root.id)
-                    product = root.history.split(':')[-1]
-                    data['product'].append(product)
-                    data['datetime'].append(root.observation_start_time)
-                    data['path'].append(file)
-                    data['format'].append(suffix)
-                    data['fillvalue'].append(root['geophysical_data'][product]._FillValue)
+            data = self.datalist(os.path.join(dataset_path, file), data)
+            data['npy'].append(self.generate_product_npy(npy_path, data['id'][-1], os.path.join(dataset_path, file), data['product'][-1]))
 
         with open(os.path.join(json_path, json_name), 'w') as file:
             json.dump(pd.DataFrame(data=data).to_json(), file)
         return pd.DataFrame(data=data)
+    
+    def generate_product_npy(self, npy_path, npy_name, datafile, product_type):
+        """
+        export 2-d array of flag & product from NetCDF4 file.
+        """
+        npy_output = os.path.join(npy_path, npy_name)
+        with nc4.Dataset(os.path.join(datafile)) as root:
+            product_array = np.array(root['geophysical_data'][product_type])
+            np.save(npy_output, product_array)
+        return npy_output
+
+    def datalist(self, nc_file, data):
+        _, suffix = os.path.basename(nc_file).split('.')
+
+        if suffix == 'nc':
+            with nc4.Dataset(nc_file) as root:
+                data['id'].append(root.id)
+                product = root.history.split(':')[-1]
+                data['product'].append(product)
+                data['datetime'].append(root.observation_start_time)
+                data['path'].append(nc_file)
+                data['format'].append(suffix)
+                data['fillvalue'].append(root['geophysical_data'][product]._FillValue)
+        return data
 
 
